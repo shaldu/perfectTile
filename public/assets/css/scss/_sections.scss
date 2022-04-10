@@ -1,0 +1,23 @@
+section {
+    width: 100vw;
+    height: 100vh;
+    scroll-behavior: smooth;
+}
+
+.section-1 {
+    background: goldenrod;
+}
+
+.section-2 {
+    background: lawngreen;
+}
+
+.section-arrows {
+    .arrows {
+        height: 25px;
+        width: 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+}

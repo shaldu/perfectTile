@@ -6,9 +6,7 @@ const app = Express();
 const server = require('http').createServer(app);
 const escape = require('escape-html');
 
-console.log("running on: localhost:3000");
-console.log("TRY SHOPWARE FOR FREE:");
-console.log("https://www.shopware.com");
+console.log("running on: http://localhost:3000");
 const io = require('socket.io')(server, {
     cors: {
         origin: "http://localhost:3000",

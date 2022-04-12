@@ -1,0 +1,19 @@
+.player-info {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    .inner-container {
+        width: 300px;
+        display: flex;
+        margin: auto;
+        .progress {
+            width: 100%;
+        }
+        .progress-bar {
+            background-color: green;
+        }
+    }
+}

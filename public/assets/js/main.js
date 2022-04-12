@@ -6,10 +6,6 @@ import Stats from '/examples/jsm/libs/stats.module.js';
 import PRNG from './prng/prng.js';
 
 
-
-
-
-const URL = "http://localhost:3000";
 // const socket = io({ transports: ['websocket'], upgrade: false, autoConnect: true, reconnection: false });
 
 // socket.onAny((event, ...args) => {
@@ -23,17 +19,21 @@ const URL = "http://localhost:3000";
 // }
 
 //init all variables
-let scene, camera, renderer, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos,wave;
+let scene, camera, renderer, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos, wave, stopRender = false,
+    timeUpdate = 0;
 
 function initThree() {
     //init three js 
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    //add orthographic camera with zoom variable
+    let zoom = 50;
+    camera = new THREE.OrthographicCamera(-window.innerWidth / zoom, window.innerWidth / zoom, window.innerHeight / zoom, -window.innerHeight / zoom, 1, 1000);
+
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x000000, 1);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.anisotropy = 0;
     document.body.appendChild(renderer.domElement);
 
     //init controls
@@ -42,17 +42,14 @@ function initThree() {
     controls.enableRotate = false;
     controls.dampingFactor = 0.25;
     controls.enableZoom = true;
-    controls.minDistance = 1;
-    controls.maxDistance = 10000;
     controls.enablePan = true;
 
-
+    clock = new Clock();
     mousePos = new Vector3(0, 0, 0);
 
     //set control position and look at
     camera.position.set(0, 0, 20);
     camera.lookAt(0, 0, 0);
-
 
     controls.update();
 
@@ -61,20 +58,35 @@ function initThree() {
 
     prng = new PRNG(Date.now());
 
-
-    wave = new Wave(5, 120, 20000, 12);
+    let player = new Player();
+    wave = new Wave(5, 60, 15, 1, player);
     animate();
 }
 
 //create animation loop
 function animate() {
-    requestAnimationFrame(animate);
+    if (stopRender) {
+        console.log('lol');
+    } else {
+        requestAnimationFrame(animate);
+    }
+
+
     renderer.render(scene, camera);
     controls.update();
-    
-    if (wave){
+
+    if (wave) {
         wave.moveInstancedMeshes();
     }
+
+    //1 sec timer
+    if (timeUpdate >= 1) {
+        timeUpdate = 0;
+        wave.reduceTime();
+    } else {
+        timeUpdate += clock.getDelta();
+    }
+
 
     stats.update()
 }
@@ -87,6 +99,11 @@ function onMouseMove(event) {
     mousePos.y = -(((event.clientY / window.innerHeight) * 2 - 1) * camera.position.z) + camera.position.y;
 
 }
+
+//mouse scroll event listener
+window.addEventListener('wheel', function(event) {
+
+});
 
 //create mouse move event
 window.addEventListener('mousemove', onMouseMove, false);
@@ -101,16 +118,18 @@ function randomRange(min, max) {
 
 export class Enemy {
     constructor(x, y, level) {
+        this.initialPosition = new Vector3(x, y, 0);
         this.position = new Vector3(x, y, 0);
         this.isDead = false;
+        this.damage = 1;
         // this.speed = randomRange(0.001, 0.005);
-        this.speed = 0.001 + (level * 0.001);
+        this.speed = 0.00005 + (level * 0.0002);
     }
 
-    //create a move towards function
+    //find fix for this, currentry faster on out side and slow on inside
     moveTowards(x, y) {
-        this.position.x += (x - this.position.x) * this.speed;
-        this.position.y += (y - this.position.y) * this.speed;
+        this.position.x += ((x - this.initialPosition.x) * this.speed);
+        this.position.y += ((y - this.initialPosition.y) * this.speed);
     }
 
     kill() {
@@ -120,10 +139,73 @@ export class Enemy {
     }
 }
 
+export class Player {
+    constructor() {
+        this.maxHealth = 100;
+        this.health = this.maxHealth;
+        this.level = 1;
+        this.isDead = false;
+        this.exp = 0;
+        this.expToNextLevel = 100;
+
+        this.createPlayerSprite();
+        this.updateHealthProgressbar();
+    }
+
+    gameOver() {
+        this.isDead = true;
+        if (this.isDead) {
+            this.health = 0;
+            stopRender = true;
+            //show game over screen
+        }
+    }
+
+    createPlayerSprite() {
+        //create player sprite
+        const texture = new THREE.TextureLoader().load('/assets/gameAssets/player.png');
+        texture.minFilter = THREE.NearestFilter;
+        texture.magFilter = THREE.NearestFilter;
+        let playerGeometry = new THREE.PlaneGeometry(1, 1);
+        let playerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, map: texture });
+        let playerSprite = new THREE.Mesh(playerGeometry, playerMaterial);
+        //add mipmap nearest to avoid blurry textures
+
+        playerSprite.scale.set(2, 2, 2);
+        playerSprite.position.set(0, 0, 1);
+        scene.add(playerSprite);
+    }
+
+    updateHealthProgressbar() {
+        let healthProgressbar = document.getElementById('player-health-pb');
+        healthProgressbar.style.width = ((this.health / this.maxHealth) * 100) + '%';
+    }
+
+    takeDamage(damage) {
+        this.health -= damage;
+        this.updateHealthProgressbar();
+        if (this.health <= 0) {
+            this.gameOver();
+        }
+    }
+    getExp(exp) {
+        this.exp += exp;
+        if (this.exp >= this.expToNextLevel) {
+            this.exp = 0;
+            this.levelUp();
+        }
+    }
+    levelUp() {
+        this.level++;
+        this.expToNextLevel = this.expToNextLevel * 2;
+    }
+
+
+}
 
 //create a wave class
 export class Wave {
-    constructor(waveTimeToSpawn, waveLengthTime, enemyCount, waveLevel) {
+    constructor(waveTimeToSpawn, waveLengthTime, enemyCount, waveLevel, player) {
         this.waveTimeToSpawn = waveTimeToSpawn;
         this.waveLengthTime = waveLengthTime;
         this.enemyCount = enemyCount;
@@ -131,37 +213,31 @@ export class Wave {
         this.waveStarted = false;
         this.waveEnded = false;
         this.waveTimer = waveLengthTime;
-        this.waveTimeToSpawnTimer = waveTimeToSpawn;
         this.waveTimeInterval;
-        this.startTimerForWaveStart();
+        this.player = player;
     }
 
-    startTimerForWaveStart() {
-        let waveTimeToSpawnInterval = setInterval(() => {
-            this.waveTimeToSpawnTimer--;
-            console.log(this.waveTimeToSpawnTimer);
-            this.updateWaveTimerVisual(this.waveTimeToSpawnTimer, false);
-            if (this.waveTimeToSpawnTimer <= 0) {
+    reduceTime() {
+        if (this.waveStarted) {
+            this.waveTimer--;
+            this.updateWaveTimerVisual(this.waveTimer, true);
+            if (this.waveTimer <= 0) {
+                this.endWave();
+            }
+        } else {
+            this.waveTimeToSpawn--;
+            this.updateWaveTimerVisual(this.waveTimeToSpawn, false);
+            if (this.waveTimeToSpawn <= 0) {
                 this.startWave();
-                clearInterval(waveTimeToSpawnInterval);
             }
-            if (this.waveStarted) {
-                clearInterval(waveTimeToSpawnInterval);
-            }
-        }, 1000);
+        }
     }
+
+    endWave() {}
 
     startWave() {
         this.waveStarted = true;
         this.createWaveSpawner(this.enemyCount);
-        //wave loop timer
-        this.waveTimeInterval = setInterval(() => {
-            this.updateWaveTimer();
-            if (this.waveTimer < 0) {
-                this.waveEnded = true;
-                clearInterval(this.waveTimeInterval);
-            }
-        }, 1000);
     }
 
     spawnEnemys() {
@@ -195,8 +271,10 @@ export class Wave {
 
     createWaveSpawner(count) {
         const texture = new THREE.TextureLoader().load('/assets/gameAssets/circle.png');
-
-        const geometry = new THREE.PlaneGeometry(1, 1);
+        texture.minFilter = THREE.NearestFilter;
+        texture.magFilter = THREE.NearestFilter;
+        const scale = 0.5;
+        const geometry = new THREE.PlaneGeometry(scale, scale);
         const material = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             map: texture,
@@ -207,8 +285,8 @@ export class Wave {
 
         mesh = new THREE.InstancedMesh(geometry, material, count);
 
-        let minDistance = 60.0;
-        let maxDistance = clampValue(count, 60, 10000);
+        let minDistance = 40.0;
+        let maxDistance = clampValue(count, 100, 10000);
 
         //init enemy
         enemys = [];
@@ -279,8 +357,9 @@ export class Wave {
 
                 let distance = enemys[i].position.distanceTo(cameraPosNoZ)
 
-                if (distance < 2) {
+                if (distance < 1.5) {
                     enemys[i].isDead = true
+                    this.player.takeDamage(enemys[i].damage);
                 } else {
 
                 }

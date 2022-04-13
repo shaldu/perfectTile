@@ -42,7 +42,7 @@ function initThree() {
     controls.enableRotate = false;
     controls.dampingFactor = 0.25;
     controls.enableZoom = true;
-    controls.enablePan = true;
+    controls.enablePan = false;
 
     clock = new Clock();
     mousePos = new Vector3(0, 0, 0);
@@ -59,7 +59,7 @@ function initThree() {
     prng = new PRNG(Date.now());
 
     let player = new Player();
-    wave = new Wave(5, 60, 15, 1, player);
+    wave = new Wave(1, 60, 15, 1, player);
     animate();
 }
 
@@ -121,7 +121,7 @@ export class Enemy {
         this.initialPosition = new Vector3(x, y, 0);
         this.position = new Vector3(x, y, 0);
         this.isDead = false;
-        this.damage = 1;
+        this.damage = 20;
         // this.speed = randomRange(0.001, 0.005);
         this.speed = 0.00005 + (level * 0.0002);
     }
@@ -158,6 +158,9 @@ export class Player {
             this.health = 0;
             stopRender = true;
             //show game over screen
+            const gameOver = document.querySelector('.game-over');
+            gameOver.addEventListener("click", () => {window.location.reload()});
+            gameOver.classList.add("show");
         }
     }
 

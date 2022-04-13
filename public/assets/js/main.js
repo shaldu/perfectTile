@@ -4,7 +4,7 @@ import { Clock } from '/build/three.module.js';
 import { OrbitControls } from './COrbitControls.js';
 import Stats from '/examples/jsm/libs/stats.module.js';
 import PRNG from './prng/prng.js';
-
+import WaveData from './waveData.js';
 
 // const socket = io({ transports: ['websocket'], upgrade: false, autoConnect: true, reconnection: false });
 
@@ -20,9 +20,14 @@ import PRNG from './prng/prng.js';
 
 //init all variables
 let scene, camera, renderer, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos, wave, stopRender = false,
-    timeUpdate = 0;
+    timeUpdate = 0,
+    waveData,
+    wavelevel = 0
 
 function initThree() {
+
+    waveData = new WaveData().data;
+
     //init three js 
     scene = new THREE.Scene();
     //add orthographic camera with zoom variable
@@ -59,9 +64,20 @@ function initThree() {
     prng = new PRNG(Date.now());
 
     let player = new Player();
-    wave = new Wave(1, 60, 15, 1, player);
+    createNewWave(player);
     animate();
 }
+
+function createNewWave(player) {
+
+    wavelevel++;
+    let data = waveData[wavelevel - 1];
+    console.log(data);
+    wave = new Wave(data.waveTimeToSpawn, data.waveLengthTime, data.enemyCount, wavelevel, player);
+    //get waveRound div element and set wavelevel
+    document.getElementById('waveRound').innerHTML = "Wave: " + wavelevel;
+}
+
 
 //create animation loop
 function animate() {
@@ -117,13 +133,14 @@ function randomRange(min, max) {
 }
 
 export class Enemy {
-    constructor(x, y, level) {
+    constructor(x, y, level, id) {
+        this.enemyID = id;
         this.initialPosition = new Vector3(x, y, 0);
         this.position = new Vector3(x, y, 0);
         this.isDead = false;
-        this.damage = 20;
+        this.damage = 1;
         // this.speed = randomRange(0.001, 0.005);
-        this.speed = 0.00005 + (level * 0.0002);
+        this.speed = 0.0003 + (level * 0.00015);
     }
 
     //find fix for this, currentry faster on out side and slow on inside
@@ -134,7 +151,7 @@ export class Enemy {
 
     kill() {
         this.speed = 0;
-        this.position.z = -1;
+        this.position.z = -10;
         this.isDead = true;
     }
 }
@@ -159,7 +176,7 @@ export class Player {
             stopRender = true;
             //show game over screen
             const gameOver = document.querySelector('.game-over');
-            gameOver.addEventListener("click", () => {window.location.reload()});
+            gameOver.addEventListener("click", () => { window.location.reload() });
             gameOver.classList.add("show");
         }
     }
@@ -203,7 +220,6 @@ export class Player {
         this.expToNextLevel = this.expToNextLevel * 2;
     }
 
-
 }
 
 //create a wave class
@@ -236,18 +252,17 @@ export class Wave {
         }
     }
 
-    endWave() {}
+    endWave() {
+        if (!this.waveEnded) {
+            this.waveEnded = true;
+            scene.remove(mesh);
+            createNewWave(this.player);
+        }
+    }
 
     startWave() {
         this.waveStarted = true;
         this.createWaveSpawner(this.enemyCount);
-    }
-
-    spawnEnemys() {
-        for (let i = 0; i < this.enemyCount; i++) {
-            let enemy = new Enemy(0, 0);
-            enemys.push(enemy);
-        }
     }
 
     updateWaveTimer() {
@@ -308,7 +323,7 @@ export class Wave {
             let spawnPosition = new Vector3(Math.cos(angle) * distance, Math.sin(angle) * distance, 0);
 
             //create enemy and add to array
-            enemys.push(new Enemy(spawnPosition.x, spawnPosition.y, this.waveLevel));
+            enemys.push(new Enemy(spawnPosition.x, spawnPosition.y, this.waveLevel, i));
 
 
             //set the matrix
@@ -343,33 +358,35 @@ export class Wave {
         scene.add(mesh);
     }
 
-    //TODO: change this to a loop for each enemy instead of a for instance loop
     moveInstancedMeshes() {
-        if (this.waveStarted) {
+        let deadEnemyCount = 0;
+        if (typeof(enemys) != "undefined" && enemys.length > 0) {
             for (let i = 0; i < this.enemyCount; i++) {
-                if (enemys[i].isDead) {
+
+                const enemy = enemys[i];
+                if (typeof(enemy) == "undefined")
+                    continue;
+                if (enemy.isDead) {
+                    deadEnemyCount++;
                     continue;
                 }
-
-                //get enemy
-                let enemy = enemys[i];
 
                 enemy.moveTowards(camera.position.x, camera.position.y);
                 let position = new THREE.Vector3(enemy.position.x, enemy.position.y, enemy.position.z);
                 let cameraPosNoZ = new THREE.Vector3(camera.position.x, camera.position.y, 0);
 
-                let distance = enemys[i].position.distanceTo(cameraPosNoZ)
+                let distance = enemy.position.distanceTo(cameraPosNoZ)
 
                 if (distance < 1.5) {
-                    enemys[i].isDead = true
-                    this.player.takeDamage(enemys[i].damage);
+                    enemy.kill();
+                    this.player.takeDamage(enemy.damage);
                 } else {
 
                 }
 
                 if (enemy.isDead) {
                     let color = new Color(0x000000);
-                    mesh.setColorAt(i, color);
+                    mesh.setColorAt(enemy.enemyID, color);
                 } else {
 
                 }
@@ -377,10 +394,16 @@ export class Wave {
                 let matrix = new THREE.Matrix4();
                 matrix.setPosition(position);
 
-                mesh.setMatrixAt(i, matrix);
+                mesh.setMatrixAt(enemy.enemyID, matrix);
                 mesh.matrixWorldNeedsUpdate = true;
                 mesh.instanceMatrix.needsUpdate = true;
                 mesh.instanceColor.needsUpdate = true;
+
+            }
+        }
+        if (deadEnemyCount === this.enemyCount) {
+            if (this.waveStarted) {
+                this.endWave();
             }
         }
     }

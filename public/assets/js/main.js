@@ -19,7 +19,7 @@ import WaveData from './waveData.js';
 // }
 
 //init all variables
-let scene, camera, renderer, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos, wave, stopRender = false,
+let scene, camera, renderer,deltaTime, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos, wave, stopRender = false,
     timeUpdate = 0,
     waveData,
     wavelevel = 0
@@ -50,6 +50,7 @@ function initThree() {
     controls.enablePan = false;
 
     clock = new Clock();
+    clock.start();
     mousePos = new Vector3(0, 0, 0);
 
     //set control position and look at
@@ -87,7 +88,7 @@ function animate() {
         requestAnimationFrame(animate);
     }
 
-
+    deltaTime = clock.getDelta();
     renderer.render(scene, camera);
     controls.update();
 
@@ -100,7 +101,7 @@ function animate() {
         timeUpdate = 0;
         wave.reduceTime();
     } else {
-        timeUpdate += clock.getDelta();
+        timeUpdate += deltaTime;
     }
 
 
@@ -140,13 +141,13 @@ export class Enemy {
         this.isDead = false;
         this.damage = 1;
         // this.speed = randomRange(0.001, 0.005);
-        this.speed = 0.0003 + (level * 0.00015);
+        this.speed = randomRange(0.1,0.15) + (level * 0.00015);
     }
 
     //find fix for this, currentry faster on out side and slow on inside
     moveTowards(x, y) {
-        this.position.x += ((x - this.initialPosition.x) * this.speed);
-        this.position.y += ((y - this.initialPosition.y) * this.speed);
+        this.position.x += ((x - this.initialPosition.x) * this.speed)*deltaTime;
+        this.position.y += ((y - this.initialPosition.y) * this.speed)*deltaTime;
     }
 
     kill() {
@@ -176,7 +177,7 @@ export class Player {
             stopRender = true;
             //show game over screen
             const gameOver = document.querySelector('.game-over');
-            gameOver.addEventListener("click", () => { window.location.reload() });
+            gameOver.querySelector("button").addEventListener("click", () => { window.location.reload() });
             gameOver.classList.add("show");
         }
     }

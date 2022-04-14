@@ -19,7 +19,7 @@ import WaveData from './waveData.js';
 // }
 
 //init all variables
-let scene, camera, renderer,deltaTime, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos, wave, stopRender = false,
+let scene, camera, renderer, deltaTime, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos, wave, stopRender = false,
     timeUpdate = 0,
     waveData,
     wavelevel = 0
@@ -118,7 +118,7 @@ function onMouseMove(event) {
 }
 
 //mouse scroll event listener
-window.addEventListener('wheel', function(event) {
+window.addEventListener('wheel', function (event) {
 
 });
 
@@ -136,18 +136,21 @@ function randomRange(min, max) {
 export class Enemy {
     constructor(x, y, level, id) {
         this.enemyID = id;
+        this.distance;
         this.initialPosition = new Vector3(x, y, 0);
         this.position = new Vector3(x, y, 0);
         this.isDead = false;
         this.damage = 1;
         // this.speed = randomRange(0.001, 0.005);
-        this.speed = randomRange(0.1,0.15) + (level * 0.00015);
+        this.speed = randomRange(0.1, 0.15) + (level * 0.00015);
     }
 
     //find fix for this, currentry faster on out side and slow on inside
     moveTowards(x, y) {
-        this.position.x += ((x - this.initialPosition.x) * this.speed)*deltaTime;
-        this.position.y += ((y - this.initialPosition.y) * this.speed)*deltaTime;
+        this.position.x += ((x - this.initialPosition.x) * this.speed) * deltaTime;
+        this.position.y += ((y - this.initialPosition.y) * this.speed) * deltaTime;
+        const cameraPosNoZ = new THREE.Vector3(camera.position.x, camera.position.y, 0);
+        this.distance = this.position.distanceTo(cameraPosNoZ)
     }
 
     kill() {
@@ -159,6 +162,7 @@ export class Enemy {
 
 export class Player {
     constructor() {
+        this.enemyTarget;
         this.maxHealth = 100;
         this.health = this.maxHealth;
         this.level = 1;
@@ -257,6 +261,8 @@ export class Wave {
         if (!this.waveEnded) {
             this.waveEnded = true;
             scene.remove(mesh);
+            this.player.enemyTarget = undefined;
+            enemys = [];
             createNewWave(this.player);
         }
     }
@@ -361,11 +367,11 @@ export class Wave {
 
     moveInstancedMeshes() {
         let deadEnemyCount = 0;
-        if (typeof(enemys) != "undefined" && enemys.length > 0) {
+        if (typeof (enemys) != "undefined" && enemys.length > 0) {
             for (let i = 0; i < this.enemyCount; i++) {
 
                 const enemy = enemys[i];
-                if (typeof(enemy) == "undefined")
+                if (typeof (enemy) == "undefined")
                     continue;
                 if (enemy.isDead) {
                     deadEnemyCount++;
@@ -373,10 +379,17 @@ export class Wave {
                 }
 
                 enemy.moveTowards(camera.position.x, camera.position.y);
-                let position = new THREE.Vector3(enemy.position.x, enemy.position.y, enemy.position.z);
-                let cameraPosNoZ = new THREE.Vector3(camera.position.x, camera.position.y, 0);
+                const position = new THREE.Vector3(enemy.position.x, enemy.position.y, enemy.position.z);
+                const cameraPosNoZ = new THREE.Vector3(camera.position.x, camera.position.y, 0);
 
-                let distance = enemy.position.distanceTo(cameraPosNoZ)
+                const distance = enemy.position.distanceTo(cameraPosNoZ)
+
+                let isTarget = false;
+
+                if (typeof (this.player.enemyTarget) == "undefined" || distance <= this.player.enemyTarget.distance) {
+                    this.player.enemyTarget = enemy;
+                    isTarget = true;
+                }
 
                 if (distance < 1.5) {
                     enemy.kill();
@@ -387,9 +400,17 @@ export class Wave {
 
                 if (enemy.isDead) {
                     let color = new Color(0x000000);
-                    mesh.setColorAt(enemy.enemyID, color);
+                    mesh.setColorAt(i, color);
                 } else {
-
+                    if (isTarget){
+                        //add color red
+                        let color = new Color(0xff0000);
+                        mesh.setColorAt(i, color);
+                    } else {
+                        //add color red
+                        let color = new Color(0xffffff);
+                        mesh.setColorAt(i, color);
+                    }
                 }
 
                 let matrix = new THREE.Matrix4();

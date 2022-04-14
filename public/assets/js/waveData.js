@@ -3,14 +3,14 @@ export default class WaveData {
 
         {
             "wave": "1",
-            "waveTimeToSpawn": 5,
+            "waveTimeToSpawn": 3,
             "waveLengthTime": 20,
-            "enemyCount": 5
+            "enemyCount": 1
         }, {
             "wave": "2",
-            "waveTimeToSpawn": 5,
+            "waveTimeToSpawn": 3,
             "waveLengthTime": 25,
-            "enemyCount": 15
+            "enemyCount": 5
         }, {
             "wave": "3",
             "waveTimeToSpawn": 10,

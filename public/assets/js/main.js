@@ -82,18 +82,21 @@ function createNewWave(player) {
 
 //create animation loop
 function animate() {
+
     if (stopRender) {
-        console.log('lol');
+
     } else {
         requestAnimationFrame(animate);
     }
 
-    deltaTime = clock.getDelta();
     renderer.render(scene, camera);
     controls.update();
 
+    deltaTime = clock.getDelta();
+
     if (wave) {
         wave.moveInstancedMeshes();
+        wave.player.update();
     }
 
     //1 sec timer
@@ -103,9 +106,8 @@ function animate() {
     } else {
         timeUpdate += deltaTime;
     }
-
-
     stats.update()
+
 }
 
 //calculate mouse position on screen
@@ -118,7 +120,7 @@ function onMouseMove(event) {
 }
 
 //mouse scroll event listener
-window.addEventListener('wheel', function (event) {
+window.addEventListener('wheel', function(event) {
 
 });
 
@@ -133,31 +135,113 @@ function randomRange(min, max) {
     return Math.random() * (max - min) + min;
 }
 
+//normalize vector 
+function normalizeVector(v, out) {
+    out = out || new Vector3();
+    let length = v.length();
+    out.x = v.x / length;
+    out.y = v.y / length;
+    out.z = v.z / length;
+    return out;
+}
+
+
 export class Enemy {
     constructor(x, y, level, id) {
         this.enemyID = id;
         this.distance;
         this.initialPosition = new Vector3(x, y, 0);
-        this.position = new Vector3(x, y, 0);
+        this.position = this.initialPosition;
         this.isDead = false;
         this.damage = 1;
+        this.life = 2 + (0.25 * level);
         // this.speed = randomRange(0.001, 0.005);
-        this.speed = randomRange(0.1, 0.15) + (level * 0.00015);
+        this.speed = randomRange(5, 14.5) + (level * 0.25);
     }
 
-    //find fix for this, currentry faster on out side and slow on inside
     moveTowards(x, y) {
-        this.position.x += ((x - this.initialPosition.x) * this.speed) * deltaTime;
-        this.position.y += ((y - this.initialPosition.y) * this.speed) * deltaTime;
-        const cameraPosNoZ = new THREE.Vector3(camera.position.x, camera.position.y, 0);
-        this.distance = this.position.distanceTo(cameraPosNoZ)
+        this.distance = this.position.distanceTo(new THREE.Vector3(0, 0, 0))
+        let normalizedVector = normalizeVector(new THREE.Vector3(x, y, 0).sub(this.position));
+        this.position.x += normalizedVector.x * this.speed * deltaTime;
+        this.position.y += normalizedVector.y * this.speed * deltaTime;
+
     }
 
-    kill() {
+    takeDamage(damage, player) {
+        this.life -= damage;
+        if (this.life <= 0) {
+            this.kill(player);
+        }
+    }
+
+    kill(player) {
         this.speed = 0;
         this.position.z = -10;
         this.isDead = true;
+        let color = new Color(0x000000);
+        mesh.setColorAt(this.enemyID, color);
+        player.enemyTarget = undefined;
     }
+}
+
+export class Projectile {
+    constructor(enemyTarget, damage, speed, radius, lifespan, textureUrl, color, player) {
+        this.damage = damage;
+        this.speed = speed;
+        this.textureUrl = textureUrl;
+        this.color = color;
+        this.radius = radius;
+        this.lifespan = lifespan;
+        this.position = new Vector3(0, 0, 2);
+        this.bullet = null;
+        this.enemyTarget = enemyTarget;
+        this.player = player;
+        this.createBullet();
+    }
+
+    //create a bullet with three js
+    createBullet() {
+        const texture = new THREE.TextureLoader().load(this.textureUrl);
+        texture.minFilter = THREE.NearestFilter;
+        texture.magFilter = THREE.NearestFilter;
+        const geometry = new THREE.PlaneGeometry(1, 1);
+        const material = new THREE.MeshBasicMaterial({
+            color: this.color,
+            map: texture,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            transparent: true
+        });
+
+        this.bullet = new THREE.Mesh(geometry, material);
+        this.bullet.scale.set(this.radius, this.radius, this.radius);
+        this.bullet.position.set(this.position.x, this.position.y, 2);
+        scene.add(this.bullet);
+    }
+
+    moveTo() {
+        if (this.enemyTarget != null) {
+
+            let normalizedVector = normalizeVector(new THREE.Vector3(this.enemyTarget.position.x, this.enemyTarget.position.y, 0).sub(this.position));
+            this.position.x += normalizedVector.x * this.speed * deltaTime;
+            this.position.y += normalizedVector.y * this.speed * deltaTime;
+            this.bullet.position.set(this.position.x, this.position.y, 2);
+            this.position.z = 0;
+
+            if (this.enemyTarget.isDead) {
+                this.player.removeProjectile(this);
+            }
+
+
+            if (this.position.distanceTo(this.enemyTarget.position) <= this.radius) {
+                this.enemyTarget.takeDamage(this.damage, this.player);
+                this.player.removeProjectile(this);
+            }
+        }
+    }
+
+
+
 }
 
 export class Player {
@@ -169,10 +253,45 @@ export class Player {
         this.isDead = false;
         this.exp = 0;
         this.expToNextLevel = 100;
-
+        this.attackSpeed = 0.02;
+        this.attackTimer = 0;
+        this.projectiles = [];
         this.createPlayerSprite();
         this.updateHealthProgressbar();
     }
+
+    update() {
+        //create a projectile every attackSpeed
+        if (this.enemyTarget != null) {
+            if (this.attackTimer >= this.attackSpeed) {
+                this.attackTimer = 0;
+                this.shoot();
+
+            } else {
+                this.attackTimer += deltaTime;
+            }
+        }
+        if (this.projectiles.length > 0) {
+            this.projectiles.forEach(projectile => {
+                //move projectile
+
+                projectile.moveTo();
+            });
+        }
+
+    }
+
+    removeProjectile(projectile) {
+        //remove projectile from array
+        this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+        scene.remove(projectile.bullet);
+    }
+
+    shoot() {
+        const projectile = new Projectile(this.enemyTarget, 5, 55, 1, 0.5, '/assets/gameAssets/circle.png', 0x00ffff, this);
+        this.projectiles.push(projectile);
+    }
+
 
     gameOver() {
         this.isDead = true;
@@ -192,12 +311,18 @@ export class Player {
         texture.minFilter = THREE.NearestFilter;
         texture.magFilter = THREE.NearestFilter;
         let playerGeometry = new THREE.PlaneGeometry(1, 1);
-        let playerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, map: texture });
+        let playerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            map: texture,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            transparent: true
+        });
         let playerSprite = new THREE.Mesh(playerGeometry, playerMaterial);
         //add mipmap nearest to avoid blurry textures
 
         playerSprite.scale.set(2, 2, 2);
-        playerSprite.position.set(0, 0, 1);
+        playerSprite.position.set(0, 0, 5);
         scene.add(playerSprite);
     }
 
@@ -367,16 +492,17 @@ export class Wave {
 
     moveInstancedMeshes() {
         let deadEnemyCount = 0;
-        if (typeof (enemys) != "undefined" && enemys.length > 0) {
+        if (typeof(enemys) != "undefined" && enemys.length > 0) {
             for (let i = 0; i < this.enemyCount; i++) {
 
                 const enemy = enemys[i];
-                if (typeof (enemy) == "undefined")
+                if (typeof(enemy) == "undefined")
                     continue;
                 if (enemy.isDead) {
                     deadEnemyCount++;
                     continue;
                 }
+
 
                 enemy.moveTowards(camera.position.x, camera.position.y);
                 const position = new THREE.Vector3(enemy.position.x, enemy.position.y, enemy.position.z);
@@ -385,24 +511,38 @@ export class Wave {
                 const distance = enemy.position.distanceTo(cameraPosNoZ)
 
                 let isTarget = false;
-
-                if (typeof (this.player.enemyTarget) == "undefined" || distance <= this.player.enemyTarget.distance) {
-                    this.player.enemyTarget = enemy;
-                    isTarget = true;
-                }
+                let isTargetSkip = false;
 
                 if (distance < 1.5) {
-                    enemy.kill();
+                    enemy.kill(this.player);
                     this.player.takeDamage(enemy.damage);
+                    continue;
                 } else {
 
+                }
+
+                if (typeof(this.player.enemyTarget) == "undefined") {
+                    this.player.enemyTarget = enemy;
+                    isTargetSkip = true;
+                }
+
+                if (!isTargetSkip && distance - 0.001 <= this.player.enemyTarget.distance) {
+                    this.player.enemyTarget = enemy;
+                    isTarget = true;
                 }
 
                 if (enemy.isDead) {
                     let color = new Color(0x000000);
                     mesh.setColorAt(i, color);
+
+                    if (isTarget) {
+                        this.player.enemyTarget = undefined;
+                    }
+
+                    continue;
                 } else {
-                    if (isTarget){
+
+                    if (isTarget) {
                         //add color red
                         let color = new Color(0xff0000);
                         mesh.setColorAt(i, color);

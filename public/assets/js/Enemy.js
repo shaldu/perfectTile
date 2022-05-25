@@ -35,7 +35,9 @@ export default class Enemy {
         this.isDead = true;
         let color = new Color(0x000000);
         this.mesh.setColorAt(this.enemyID, color);
-        player.enemyTarget = undefined;
+        if (player) {
+            player.enemyTarget = undefined;
+        }
     }
 
     randomRange(min, max) {

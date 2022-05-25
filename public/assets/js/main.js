@@ -6,6 +6,7 @@ import Stats from '/examples/jsm/libs/stats.module.js';
 import PRNG from './prng/prng.js';
 import WaveData from './waveData.js';
 import Enemy from './Enemy.js';
+import Bullet from './Bullet.js';
 
 // const socket = io({ transports: ['websocket'], upgrade: false, autoConnect: true, reconnection: false });
 
@@ -23,7 +24,8 @@ import Enemy from './Enemy.js';
 let scene, camera, renderer, deltaTime, controls, raycaster, mouse, clock, prng, mesh, dummy, stats, sectionWidth, count, enemys, mousePos, wave, stopRender = false,
     timeUpdate = 0,
     waveData,
-    wavelevel = 0
+    wavelevel = 0,
+    player
 
 function initThree() {
 
@@ -65,7 +67,7 @@ function initThree() {
 
     prng = new PRNG(Date.now());
 
-    let player = new Player();
+    player = new Player();
     createNewWave(player);
     animate();
 }
@@ -121,7 +123,7 @@ function onMouseMove(event) {
 }
 
 //mouse scroll event listener
-window.addEventListener('wheel', function(event) {
+window.addEventListener('wheel', function (event) {
 
 });
 
@@ -221,6 +223,7 @@ export class Player {
         this.attackSpeed = 0.02;
         this.attackTimer = 0;
         this.projectiles = [];
+        this.bullets = [];
         this.createPlayerSprite();
         this.updateHealthProgressbar();
     }
@@ -255,6 +258,11 @@ export class Player {
     shoot() {
         const projectile = new Projectile(this.enemyTarget, 5, 55, 1, 0.5, '/assets/gameAssets/circle.png', 0x00ffff, this);
         this.projectiles.push(projectile);
+    }
+
+    spawnBullet() {
+        const bullet = new Bullet(0, 0, 50);
+        this.bullets.push(bullet);
     }
 
 
@@ -457,11 +465,11 @@ export class Wave {
 
     moveInstancedMeshes() {
         let deadEnemyCount = 0;
-        if (typeof(enemys) != "undefined" && enemys.length > 0) {
+        if (typeof (enemys) != "undefined" && enemys.length > 0) {
             for (let i = 0; i < this.enemyCount; i++) {
 
                 const enemy = enemys[i];
-                if (typeof(enemy) == "undefined")
+                if (typeof (enemy) == "undefined")
                     continue;
                 if (enemy.isDead) {
                     deadEnemyCount++;
@@ -486,7 +494,7 @@ export class Wave {
 
                 }
 
-                if (typeof(this.player.enemyTarget) == "undefined") {
+                if (typeof (this.player.enemyTarget) == "undefined") {
                     this.player.enemyTarget = enemy;
                     isTargetSkip = true;
                 }
@@ -495,6 +503,14 @@ export class Wave {
                     this.player.enemyTarget = enemy;
                     isTarget = true;
                 }
+
+                this.player.bullets.forEach(bullet => {
+                    let bulletpos = new Vector3(bullet.position.x, bullet.position.y, 2);
+                    if (bulletpos.distanceTo(enemy.position) <= bullet.radius) {
+                        enemy.kill(null);
+                    }
+                });
+
 
                 if (enemy.isDead) {
                     let color = new Color(0x000000);
@@ -535,5 +551,14 @@ export class Wave {
         }
     }
 }
+
+//add key listener on keydown 1
+document.addEventListener('keydown', function (event) {
+    if (event.keyCode === 49) {
+        //create new wave
+        player.spawnBullet();
+    }
+});
+
 
 initThree();

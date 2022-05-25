@@ -5,6 +5,7 @@ import { OrbitControls } from './COrbitControls.js';
 import Stats from '/examples/jsm/libs/stats.module.js';
 import PRNG from './prng/prng.js';
 import WaveData from './waveData.js';
+import Enemy from './Enemy.js';
 
 // const socket = io({ transports: ['websocket'], upgrade: false, autoConnect: true, reconnection: false });
 
@@ -146,43 +147,7 @@ function normalizeVector(v, out) {
 }
 
 
-export class Enemy {
-    constructor(x, y, level, id) {
-        this.enemyID = id;
-        this.distance;
-        this.initialPosition = new Vector3(x, y, 0);
-        this.position = this.initialPosition;
-        this.isDead = false;
-        this.damage = 1;
-        this.life = 2 + (0.25 * level);
-        // this.speed = randomRange(0.001, 0.005);
-        this.speed = randomRange(5, 14.5) + (level * 0.25);
-    }
 
-    moveTowards(x, y) {
-        this.distance = this.position.distanceTo(new THREE.Vector3(0, 0, 0))
-        let normalizedVector = normalizeVector(new THREE.Vector3(x, y, 0).sub(this.position));
-        this.position.x += normalizedVector.x * this.speed * deltaTime;
-        this.position.y += normalizedVector.y * this.speed * deltaTime;
-
-    }
-
-    takeDamage(damage, player) {
-        this.life -= damage;
-        if (this.life <= 0) {
-            this.kill(player);
-        }
-    }
-
-    kill(player) {
-        this.speed = 0;
-        this.position.z = -10;
-        this.isDead = true;
-        let color = new Color(0x000000);
-        mesh.setColorAt(this.enemyID, color);
-        player.enemyTarget = undefined;
-    }
-}
 
 export class Projectile {
     constructor(enemyTarget, damage, speed, radius, lifespan, textureUrl, color, player) {
@@ -455,7 +420,7 @@ export class Wave {
             let spawnPosition = new Vector3(Math.cos(angle) * distance, Math.sin(angle) * distance, 0);
 
             //create enemy and add to array
-            enemys.push(new Enemy(spawnPosition.x, spawnPosition.y, this.waveLevel, i));
+            enemys.push(new Enemy(spawnPosition.x, spawnPosition.y, this.waveLevel, i, mesh));
 
 
             //set the matrix
@@ -504,7 +469,7 @@ export class Wave {
                 }
 
 
-                enemy.moveTowards(camera.position.x, camera.position.y);
+                enemy.moveTowards(camera.position.x, camera.position.y, deltaTime);
                 const position = new THREE.Vector3(enemy.position.x, enemy.position.y, enemy.position.z);
                 const cameraPosNoZ = new THREE.Vector3(camera.position.x, camera.position.y, 0);
 

@@ -29,7 +29,7 @@ let scene, camera, renderer, deltaTime, controls, raycaster, mouse, clock, prng,
 
 function initThree() {
 
-    waveData = new WaveData().data;
+    waveData = new WaveData();
 
     //init three js 
     scene = new THREE.Scene();
@@ -73,9 +73,8 @@ function initThree() {
 }
 
 function createNewWave(player) {
-
     wavelevel++;
-    let data = waveData[wavelevel - 1];
+    let data = waveData.nextData(wavelevel);
     console.log(data);
     wave = new Wave(data.waveTimeToSpawn, data.waveLengthTime, data.enemyCount, wavelevel, player);
     //get waveRound div element and set wavelevel
@@ -220,7 +219,7 @@ export class Player {
         this.isDead = false;
         this.exp = 0;
         this.expToNextLevel = 100;
-        this.attackSpeed = 0.02;
+        this.attackSpeed = 1;
         this.attackTimer = 0;
         this.projectiles = [];
         this.bullets = [];
@@ -234,6 +233,7 @@ export class Player {
             if (this.attackTimer >= this.attackSpeed) {
                 this.attackTimer = 0;
                 this.shoot();
+                console.log(this.exp);
 
             } else {
                 this.attackTimer += deltaTime;
@@ -311,15 +311,15 @@ export class Player {
             this.gameOver();
         }
     }
-    getExp(exp) {
+    addExp(exp) {
         this.exp += exp;
         if (this.exp >= this.expToNextLevel) {
-            this.exp = 0;
             this.levelUp();
         }
     }
     levelUp() {
         this.level++;
+        this.exp = this.exp-this.expToNextLevel;
         this.expToNextLevel = this.expToNextLevel * 2;
     }
 

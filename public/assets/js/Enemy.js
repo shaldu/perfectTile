@@ -16,10 +16,12 @@ export default class Enemy {
     }
 
     moveTowards(x, y, deltaTime) {
-        this.distance = this.position.distanceTo(new THREE.Vector3(0, 0, 0))
-        let normalizedVector = this.normalizeVector(new THREE.Vector3(x, y, 0).sub(this.position));
-        this.position.x += normalizedVector.x * this.speed * deltaTime;
-        this.position.y += normalizedVector.y * this.speed * deltaTime;
+        if (!this.isDead) {
+            this.distance = this.position.distanceTo(new THREE.Vector3(0, 0, 0))
+            let normalizedVector = this.normalizeVector(new THREE.Vector3(x, y, 0).sub(this.position));
+            this.position.x += normalizedVector.x * this.speed * deltaTime;
+            this.position.y += normalizedVector.y * this.speed * deltaTime;
+        }
     }
 
     takeDamage(damage, player) {
@@ -37,6 +39,7 @@ export default class Enemy {
         this.mesh.setColorAt(this.enemyID, color);
         if (player) {
             player.enemyTarget = undefined;
+            player.addExp(1);
         }
     }
 
